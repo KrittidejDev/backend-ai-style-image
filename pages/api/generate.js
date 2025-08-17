@@ -1,31 +1,47 @@
-import { spawn } from "child_process";
+import { hf_hub_download } from "@huggingface/hub";
+import { FluxKontextPipeline } from "diffusers";
+import fetch from "node-fetch";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).end();
-  const { prompt, style, imageBase64 } = req.body;
-  if (!prompt || !style || !imageBase64)
-    return res.status(400).json({ error: "Missing data" });
+  try {
+    const { prompt, style } = req.body;
+    if (!prompt || !style)
+      return res.status(400).json({ error: "Missing prompt or style" });
 
-  const py = spawn("python", [
-    "./scripts/generate.py",
-    prompt,
-    style,
-    imageBase64,
-  ]);
+    // โหลด LoRA weights จาก Hugging Face Hub
+    const loraPath = hf_hub_download({
+      repo_id: "Owen777/Kontext-Style-Loras",
+      filename: `${style}_lora_weights.safetensors`,
+    });
 
-  let output = "";
-  let error = "";
+    // โหลด pipeline
+    const pipeline = await FluxKontextPipeline.from_pretrained(
+      "black-forest-labs/FLUX.1-Kontext-dev"
+    );
+    pipeline.to("cuda");
+    pipeline.load_lora_weights(loraPath, { adapter_name: "lora" });
+    pipeline.set_adapters(["lora"], { adapter_weights: [1] });
 
-  py.stdout.on("data", (data) => {
-    output += data.toString();
-  });
-  py.stderr.on("data", (data) => {
-    error += data.toString();
-  });
+    // โหลด image ตัวอย่าง
+    const imageUrl =
+      "https://huggingface.co/datasets/black-forest-labs/kontext-bench/resolve/main/test/images/0003.jpg";
+    const response = await fetch(imageUrl);
+    const buffer = await response.arrayBuffer();
+    const image = await pipeline.utils.load_image(Buffer.from(buffer));
 
-  py.on("close", (code) => {
-    if (code !== 0)
-      return res.status(500).json({ error: error || "Python script failed" });
-    res.status(200).json({ image: output.trim() });
-  });
+    // Generate ภาพ
+    const result = await pipeline({
+      prompt,
+      image,
+      height: 512,
+      width: 512,
+      num_inference_steps: 24,
+    });
+    const base64Image = await result.images[0].to_base64();
+
+    res.status(200).json({ image: `data:image/png;base64,${base64Image}` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 }

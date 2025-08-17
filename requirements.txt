@@ -1,6 +1,4 @@
-torch
 diffusers
-transformers
-accelerate
-safetensors
+torch
 Pillow
+huggingface_hub

@@ -4,11 +4,15 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start -p $PORT"
   },
   "dependencies": {
-    "next": "13.5.4",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "@huggingface/hub": "^0.13.4",
+    "diffusers": "^0.21.0",
+    "torch": "^2.1.0",
+    "node-fetch": "^3.3.2"
   }
 }
