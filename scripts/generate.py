@@ -1,5 +1,5 @@
 from huggingface_hub import hf_hub_download
-from diffusers import FluxKontextPipeline
+from diffusers import FluxControlPipeline
 from diffusers.utils import load_image
 import torch
 
@@ -14,7 +14,7 @@ lora_path = hf_hub_download(
 )
 
 # 3. โหลด pipeline
-pipeline = FluxKontextPipeline.from_pretrained(
+pipeline = FluxControlPipeline.from_pretrained(
     "black-forest-labs/FLUX.1-Kontext-dev",
     torch_dtype=torch.bfloat16
 ).to('cuda')
