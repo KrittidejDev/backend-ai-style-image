@@ -1,20 +1,39 @@
-import sys, base64
-from io import BytesIO
-from PIL import Image
+from huggingface_hub import hf_hub_download
 from diffusers import FluxKontextPipeline
+from diffusers.utils import load_image
 import torch
 
-prompt, style, image_b64 = sys.argv[1], sys.argv[2], sys.argv[3]
+# 1. เลือก style
+STYLE_NAME = "3D_Chibi"
 
-image_data = base64.b64decode(image_b64.split(",")[1])
-image = Image.open(BytesIO(image_data)).convert("RGB").resize((256, 256))
+# 2. โหลดไฟล์ LoRA จาก Hugging Face runtime
+lora_path = hf_hub_download(
+    repo_id="Owen777/Kontext-Style-Loras",
+    filename=f"{STYLE_NAME}_lora_weights.safetensors",
+    local_dir="./LoRAs"
+)
 
-pipeline = FluxKontextPipeline.from_pretrained("black-forest-labs/FLUX.1-Kontext-dev", torch_dtype=torch.bfloat16).to("cuda")
-pipeline.load_lora_weights(f"./LoRAs/{style}_lora_weights.safetensors", adapter_name="lora")
+# 3. โหลด pipeline
+pipeline = FluxKontextPipeline.from_pretrained(
+    "black-forest-labs/FLUX.1-Kontext-dev",
+    torch_dtype=torch.bfloat16
+).to('cuda')
+
+# 4. โหลด LoRA weights
+pipeline.load_lora_weights(lora_path, adapter_name="lora")
 pipeline.set_adapters(["lora"], adapter_weights=[1])
 
-result = pipeline(image=image, prompt=f"{prompt}, {style} style", height=256, width=256, num_inference_steps=24).images[0]
+# 5. โหลดภาพตัวอย่าง (หรือรับจาก frontend)
+image = load_image("https://huggingface.co/datasets/black-forest-labs/kontext-bench/resolve/main/test/images/0003.jpg").resize((512, 512))
 
-buffer = BytesIO()
-result.save(buffer, format="PNG")
-print("data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode())
+# 6. Generate ภาพ
+result = pipeline(
+    image=image,
+    prompt=f"Turn this image into the {STYLE_NAME.replace('_', ' ')} style.",
+    height=512,
+    width=512,
+    num_inference_steps=24
+).images[0]
+
+# 7. บันทึกภาพ
+result.save(f"{STYLE_NAME}_generated.png")
